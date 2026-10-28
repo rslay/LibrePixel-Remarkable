@@ -1,0 +1,25 @@
+[package]
+name = "hello"
+version = "0.1.0"
+edition = "2021"
+default-run = "hello"
+description = "reMarkable 2 hello-world on AppLoad/qtfb"
+
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"
+
+[[bin]]
+name = "hello"
+path = "src/main.rs"
+
+# PC-only stand-in for the on-device qtfb server, used by tools/run_local_test.sh
+[[bin]]
+name = "fake_qtfb_server"
+path = "src/bin/fake_qtfb_server.rs"
+
+[profile.release]
+opt-level = "s"
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true

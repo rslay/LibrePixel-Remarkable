@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>rM2 simulator</title>
+<style>
+  :root { color-scheme: dark; }
+  html, body { height: 100%; margin: 0; }
+  body { display: flex; flex-direction: column; background: #2a2a2d; color: #d8d8d8;
+         font: 13px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  header { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 16px; padding: 8px 14px;
+           background: #19191b; border-bottom: 1px solid #000; }
+  header b { font-weight: 600; }
+  header label { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
+  header input[type=range] { width: 80px; }
+  header .hint { opacity: .55; }
+  #status { margin-left: auto; font-variant-numeric: tabular-nums; opacity: .85; }
+  #status.off { color: #ff8a9a; opacity: 1; }
+  main { flex: 1; min-height: 0; overflow: auto; display: flex; padding: 16px; box-sizing: border-box; }
+  #tablet { margin: auto; background: #101010; padding: 30px 18px 60px; border-radius: 20px;
+            box-shadow: 0 12px 40px #0009, inset 0 0 0 1px #2c2c2c; }
+  canvas { display: block; background: #fff; touch-action: none; cursor: crosshair; }
+</style>
+</head>
+<body>
+<header>
+  <b>rM2 simulator</b>
+  <label>Input <select id="mode"><option value="touch">Finger</option><option value="pen">Pen</option></select></label>
+  <label>Pressure <input id="pressure" type="range" min="1" max="100" value="60"> <span id="pval">60</span></label>
+  <label>Zoom <select id="zoom"><option value="fit">Fit</option><option value="50">50%</option><option value="100">100%</option></select></label>
+  <label><input id="eink" type="checkbox" checked> 16 greys</label>
+  <span class="hint">left button = finger, right button = pen</span>
+  <span id="status">connecting…</span>
+</header>
+<main><div id="tablet"><canvas id="fb" width="1404" height="1872"></canvas></div></main>
+<script>
+// qtfb input types (src/qtfb.rs)
+const T = { TOUCH_PRESS: 0x10, TOUCH_RELEASE: 0x11, TOUCH_UPDATE: 0x12,
+            PEN_PRESS: 0x20, PEN_RELEASE: 0x21, PEN_UPDATE: 0x22 };
+const NAMES = { 0x10: 'touch press', 0x11: 'touch release', 0x12: 'touch move',
+                0x20: 'pen press', 0x21: 'pen release', 0x22: 'pen move' };
+
+const $ = id => document.getElementById(id);
+const canvas = $('fb'), ctx = canvas.getContext('2d');
+const main = document.querySelector('main'), tablet = $('tablet'), status = $('status');
+let W = canvas.width, H = canvas.height;
+let seq = 0, raw = null, img = null, lut = null, connected = false, lastEvent = '';
+
+// ---- display ---------------------------------------------------------------
+function buildLut() {   // rgb565 -> ABGR32, optionally quantised to the panel's 16 greys
+  lut = new Uint32Array(65536);
+  const eink = $('eink').checked;
+  for (let p = 0; p < 65536; p++) {
+    let r = Math.round((p >> 11) * 255 / 31), g = Math.round(((p >> 5) & 63) * 255 / 63), b = Math.round((p & 31) * 255 / 31);
+    if (eink) { r = g = b = Math.round((r * 299 + g * 587 + b * 114) / 1000 / 17) * 17; }
+    lut[p] = (255 << 24 | b << 16 | g << 8 | r) >>> 0;
+  }
+}
+function paint() {
+  if (!raw) return;
+  if (!img || img.width !== W || img.height !== H) img = ctx.createImageData(W, H);
+  const out = new Uint32Array(img.data.buffer);
+  for (let i = 0; i < raw.length; i++) out[i] = lut[raw[i]];
+  ctx.putImageData(img, 0, 0);
+}
+function layout() {
+  const z = $('zoom').value;
+  let s = +z / 100;
+  if (z === 'fit') {
+    const ts = getComputedStyle(tablet), ms = getComputedStyle(main);
+    const padW = parseFloat(ts.paddingLeft) + parseFloat(ts.paddingRight) + parseFloat(ms.paddingLeft) + parseFloat(ms.paddingRight);
+    const padH = parseFloat(ts.paddingTop) + parseFloat(ts.paddingBottom) + parseFloat(ms.paddingTop) + parseFloat(ms.paddingBottom);
+    s = Math.min((main.clientWidth - padW) / W, (main.clientHeight - padH) / H);
+  }
+  canvas.style.width = Math.max(1, Math.floor(W * s)) + 'px';
+  canvas.style.height = Math.max(1, Math.floor(H * s)) + 'px';
+}
+function updateStatus() {
+  status.textContent = (connected ? 'frame #' + seq : 'app not running - waiting')
+    + ' · ' + W + '×' + H + (lastEvent ? ' · ' + lastEvent : '');
+  status.classList.toggle('off', !connected);
+}
+
+// ---- frames: long-poll the app for anything newer than what we have --------
+async function pollFrames() {
+  for (;;) {
+    try {
+      const r = await fetch('/frame?after=' + seq, { cache: 'no-store' });
+      if (r.status === 204) continue;                     // nothing new in 20 s: ask again
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      const [w, h] = (r.headers.get('X-Frame-Size') || '').split('x').map(Number);
+      seq = +r.headers.get('X-Frame-Seq');
+      raw = new Uint16Array(await r.arrayBuffer());
+      if (w && h && (w !== W || h !== H)) { W = w; H = h; canvas.width = W; canvas.height = H; layout(); }
+      connected = true; paint(); updateStatus();
+    } catch (e) {
+      connected = false; seq = 0; updateStatus();         // app gone (or not up yet): retry, take whatever it has
+      await new Promise(res => setTimeout(res, 1000));
+    }
+  }
+}
+
+// ---- input: pointer events -> qtfb events, delivered in order ---------------
+let queue = [], sending = false;
+function send(t, x, y, d, dev) {
+  queue.push(t + ' ' + x + ' ' + y + ' ' + d + ' ' + dev);
+  lastEvent = NAMES[t] + ' ' + x + ',' + y + (d ? ' p=' + d : '');
+  updateStatus();
+  if (!sending) flush();
+}
+async function flush() {
+  sending = true;
+  while (queue.length) {
+    const body = queue.join('\n'); queue = [];
+    try { await fetch('/input', { method: 'POST', body }); } catch (e) { /* app gone; the frame loop reports it */ }
+  }
+  sending = false;
+}
+const active = new Map();   // pointerId -> { pen, dev }
+function posOf(e) {
+  const r = canvas.getBoundingClientRect();
+  const x = Math.round((e.clientX - r.left) * W / r.width), y = Math.round((e.clientY - r.top) * H / r.height);
+  return [Math.min(Math.max(x, 0), W - 1), Math.min(Math.max(y, 0), H - 1)];
+}
+function pressureOf(e, pen) {
+  if (!pen) return 0;
+  return e.pointerType === 'pen' ? Math.max(1, Math.round(e.pressure * 100)) : +$('pressure').value;
+}
+function freeDev() {
+  const used = new Set([...active.values()].map(a => a.dev));
+  let d = 1; while (used.has(d)) d++;
+  return d;
+}
+canvas.addEventListener('pointerdown', e => {
+  e.preventDefault();
+  canvas.setPointerCapture(e.pointerId);
+  const pen = e.pointerType === 'pen' || e.button === 2 || $('mode').value === 'pen';
+  const a = { pen, dev: freeDev() };
+  active.set(e.pointerId, a);
+  const [x, y] = posOf(e);
+  send(pen ? T.PEN_PRESS : T.TOUCH_PRESS, x, y, pressureOf(e, pen), a.dev);
+});
+canvas.addEventListener('pointermove', e => {
+  const a = active.get(e.pointerId); if (!a) return;
+  const [x, y] = posOf(e);
+  send(a.pen ? T.PEN_UPDATE : T.TOUCH_UPDATE, x, y, pressureOf(e, a.pen), a.dev);
+});
+function release(e) {
+  const a = active.get(e.pointerId); if (!a) return;
+  active.delete(e.pointerId);
+  const [x, y] = posOf(e);
+  send(a.pen ? T.PEN_RELEASE : T.TOUCH_RELEASE, x, y, 0, a.dev);
+}
+canvas.addEventListener('pointerup', release);
+canvas.addEventListener('pointercancel', release);
+canvas.addEventListener('contextmenu', e => e.preventDefault());
+
+$('eink').addEventListener('change', () => { buildLut(); paint(); });
+$('zoom').addEventListener('change', layout);
+$('pressure').addEventListener('input', () => { $('pval').textContent = $('pressure').value; });
+window.addEventListener('resize', layout);
+buildLut(); layout(); updateStatus(); pollFrames();
+</script>
+</body>
+</html>

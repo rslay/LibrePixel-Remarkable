@@ -1,0 +1,16 @@
+# Linker settings so that rustup alone is enough: no Visual Studio, no MSYS2, no zig.
+# Both targets link with rust-lld, which ships with rustup, against the C runtime
+# objects that rustup bundles ("self-contained").
+
+# The tablet. The reMarkable 2 is a Cortex-A7 (32-bit armhf); musl makes a fully
+# static binary that runs on any rM2 firmware.
+[target.armv7-unknown-linux-musleabihf]
+linker = "rust-lld"
+rustflags = ["-C", "link-self-contained=yes", "-C", "target-feature=+crt-static"]
+
+# The PC, with the GNU toolchain (`rustup default stable-gnu`). If you use rustup's
+# default MSVC toolchain instead, this block is ignored and you need Visual Studio
+# Build Tools for the linker.
+[target.x86_64-pc-windows-gnu]
+linker = "rust-lld"
+rustflags = ["-C", "link-self-contained=yes"]
