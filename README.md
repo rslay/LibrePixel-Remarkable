@@ -1,6 +1,6 @@
 # LibrePixel
 
-A raster image editor and pixel-art editor for the reMarkable 2, written from in Rust.
+A raster image editor and pixel-art editor for the reMarkable 2, written in Rust.
 
 - Draw with the pen on a layered sprite over a 16-color palette. The eraser end of the Marker
   erases. Finger pans, two fingers zoom.
