@@ -1,13 +1,17 @@
 # LibrePixel
 
-A raster image editor and pixel-art editor for the reMarkable 2, written in Rust.
+
+The raster image editor, LibrePixel, for the **reMarkable 2**, written in Rust.
+
+Create and edit regular images like you would in Photoshop or Aesprite, and save them as PNGs, JPGs, or even PDFs you can view directly in your reMarkable 2.
+
+Also runs in **Windows**, **Linux**, and **MacOS** on the desktop.
 
 <p align="center">
 <img width="60%" height="auto" style="display: block; margin: 0 auto" alt="image" src="https://github.com/user-attachments/assets/a282ec24-dc02-4e1a-93c4-90de4f6598a1" />
 </p>
 
-- Draw with the pen on a layered sprite over a 16-color palette. The eraser end of the Marker
-  erases. Finger pans, two fingers zoom.
+- Draw with the pen on layers with a 16-color palette. Eraser support, finger panning, and two fingers zoom.
 - Saves `.ase` files that Aseprite and LibreSprite open as they are.
 - Exports images as PDF straight into the tablet's own library, and PNG and JPG to copy off USB or SSH.
 - Runs on your PC too: `cargo run` opens the tablet in a browser window where the mouse is your
@@ -24,7 +28,7 @@ winget install --id Git.Git -e
 
 This installs Rust and Git for Windows. When done, close that window.
 
-From now on use **Git Bash** (Start menu → Git Bash). In it:
+From now on, use **Git Bash** (Start menu → Git Bash). In it:
 
 ```bash
 rustup default stable-gnu                          # the Rust toolchain that needs no Visual Studio
