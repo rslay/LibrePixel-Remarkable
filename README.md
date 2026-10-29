@@ -2,6 +2,10 @@
 
 A raster image editor and pixel-art editor for the reMarkable 2, written in Rust.
 
+<p align="center">
+<img width="60%" height="auto" style="display: block; margin: 0 auto" alt="image" src="https://github.com/user-attachments/assets/a282ec24-dc02-4e1a-93c4-90de4f6598a1" />
+</p>
+
 - Draw with the pen on a layered sprite over a 16-color palette. The eraser end of the Marker
   erases. Finger pans, two fingers zoom.
 - Saves `.ase` files that Aseprite and LibreSprite open as they are.
