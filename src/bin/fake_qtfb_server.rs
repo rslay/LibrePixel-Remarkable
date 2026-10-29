@@ -11,9 +11,7 @@
 #![cfg_attr(not(unix), allow(unused))]
 
 #[cfg(unix)]
-#[path = "../qtfb.rs"]
-#[allow(dead_code)]
-mod qtfb;
+use librepixel::qtfb;
 
 #[cfg(unix)]
 use std::ffi::CString;
@@ -29,7 +27,7 @@ use qtfb::*;
 
 #[cfg(not(unix))]
 fn main() {
-    eprintln!("fake_qtfb_server needs unix sockets + POSIX shm; on Windows use `cargo run -- --headless` instead.");
+    eprintln!("fake_qtfb_server needs unix sockets + POSIX shm; on Windows use `cargo run -- --sim` instead.");
     std::process::exit(1);
 }
 

@@ -26,20 +26,22 @@
 <body>
 <header>
   <b>rM2 simulator</b>
-  <label>Input <select id="mode"><option value="touch">Finger</option><option value="pen">Pen</option></select></label>
+  <label>Input <select id="mode"><option value="touch">Finger</option><option value="pen">Pen</option><option value="eraser">Eraser</option></select></label>
   <label>Pressure <input id="pressure" type="range" min="1" max="100" value="60"> <span id="pval">60</span></label>
   <label>Zoom <select id="zoom"><option value="fit">Fit</option><option value="50">50%</option><option value="100">100%</option></select></label>
   <label><input id="eink" type="checkbox" checked> 16 greys</label>
-  <span class="hint">left button = finger, right button = pen</span>
+  <span class="hint">left button = finger, right button = pen, middle button = eraser end</span>
   <span id="status">connecting…</span>
 </header>
 <main><div id="tablet"><canvas id="fb" width="1404" height="1872"></canvas></div></main>
 <script>
 // qtfb input types (src/qtfb.rs)
 const T = { TOUCH_PRESS: 0x10, TOUCH_RELEASE: 0x11, TOUCH_UPDATE: 0x12,
-            PEN_PRESS: 0x20, PEN_RELEASE: 0x21, PEN_UPDATE: 0x22 };
+            PEN_PRESS: 0x20, PEN_RELEASE: 0x21, PEN_UPDATE: 0x22,
+            ERASER: 0x100,     // simulator only: which end of the pen is near (src/sim.rs)
+            PEN_NEAR: 0x101 }; // simulator only: the pen entered / left hover range
 const NAMES = { 0x10: 'touch press', 0x11: 'touch release', 0x12: 'touch move',
-                0x20: 'pen press', 0x21: 'pen release', 0x22: 'pen move' };
+                0x20: 'pen press', 0x21: 'pen release', 0x22: 'pen move', 0x100: 'pen end', 0x101: 'pen near' };
 
 const $ = id => document.getElementById(id);
 const canvas = $('fb'), ctx = canvas.getContext('2d');
@@ -135,10 +137,15 @@ function freeDev() {
 canvas.addEventListener('pointerdown', e => {
   e.preventDefault();
   canvas.setPointerCapture(e.pointerId);
-  const pen = e.pointerType === 'pen' || e.button === 2 || $('mode').value === 'pen';
-  const a = { pen, dev: freeDev() };
+  // Eraser end: the Eraser input mode, the middle mouse button, or a real stylus's eraser.
+  const eraser = $('mode').value === 'eraser' || e.button === 1 || e.button === 5 ||
+                 (e.pointerType === 'pen' && (e.buttons & 32) !== 0);
+  const pen = eraser || e.pointerType === 'pen' || e.button === 2 || $('mode').value === 'pen';
+  const a = { pen, eraser, dev: freeDev() };
   active.set(e.pointerId, a);
   const [x, y] = posOf(e);
+  if (eraser) send(T.ERASER, 0, 0, 1, a.dev);
+  if (pen) send(T.PEN_NEAR, 0, 0, 1, a.dev);   // the device reports hover before the press
   send(pen ? T.PEN_PRESS : T.TOUCH_PRESS, x, y, pressureOf(e, pen), a.dev);
 });
 canvas.addEventListener('pointermove', e => {
@@ -151,6 +158,8 @@ function release(e) {
   active.delete(e.pointerId);
   const [x, y] = posOf(e);
   send(a.pen ? T.PEN_RELEASE : T.TOUCH_RELEASE, x, y, 0, a.dev);
+  if (a.pen) send(T.PEN_NEAR, 0, 0, 0, a.dev);
+  if (a.eraser) send(T.ERASER, 0, 0, 0, a.dev);
 }
 canvas.addEventListener('pointerup', release);
 canvas.addEventListener('pointercancel', release);

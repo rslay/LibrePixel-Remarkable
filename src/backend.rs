@@ -20,7 +20,12 @@ pub trait Backend {
     fn update_all(&mut self) -> io::Result<()>;
     /// Push one rectangle of it.
     fn update_rect(&mut self, x: i32, y: i32, w: i32, h: i32) -> io::Result<()>;
+    /// Expensive on the tablet: AppLoad's server sleeps one second after this message before
+    /// it reads the next update from this client, so never send it while the user is
+    /// interacting (a stroke that toggles modes shows up a second late). In AppLoad as of
+    /// October 2026 the mode is stored but not applied to the display at all.
     fn set_refresh_mode(&mut self, _mode: RefreshMode) -> io::Result<()> { Ok(()) }
+    /// Same one-second stall as `set_refresh_mode`; only for an explicit user action.
     fn request_full_refresh(&mut self) -> io::Result<()> { Ok(()) }
     /// Wait up to `timeout_ms` (-1 = forever) for the next event.
     /// Ok(None) on timeout; Err when the display is gone.

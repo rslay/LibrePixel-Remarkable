@@ -1,0 +1,6 @@
+{
+  "name": "LibrePixel",
+  "application": "librepixel",
+  "qtfb": true,
+  "aspectRatio": "original"
+}

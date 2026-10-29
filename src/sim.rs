@@ -29,6 +29,14 @@ use std::time::{Duration, Instant};
 use crate::backend::Backend;
 use crate::qtfb::{DeviceState, Event, RefreshMode, UserInput, STATE_CHANGED_REASON_ROTATION};
 
+/// Simulator-only input type for `/input` lines: `256 0 0 1` means the eraser end of the pen
+/// is near the screen, `256 0 0 0` the tip. Becomes `Event::Eraser`, like the digitizer's
+/// tool report does on the device.
+pub const SIM_INPUT_ERASER: i32 = 0x100;
+/// `257 0 0 1` / `257 0 0 0`: the pen came within hover range of the screen / left it
+/// (`Event::PenNear`, the digitizer's BTN_TOOL_PEN on the device).
+pub const SIM_INPUT_PEN_NEAR: i32 = 0x101;
+
 const PAGE: &str = include_str!("sim.html");
 const DEFAULT_ADDR: &str = "127.0.0.1:1404";
 const POLL_TIMEOUT: Duration = Duration::from_secs(20);
@@ -138,12 +146,12 @@ impl Backend for Sim {
     }
 
     fn set_refresh_mode(&mut self, mode: RefreshMode) -> io::Result<()> {
-        eprintln!("hello: sim: refresh mode {mode:?}");
+        eprintln!("hello: sim: refresh mode {mode:?} (on the tablet this stalls AppLoad's updates for 1 s)");
         Ok(())
     }
 
     fn request_full_refresh(&mut self) -> io::Result<()> {
-        eprintln!("hello: sim: full refresh requested");
+        eprintln!("hello: sim: full refresh requested (on the tablet this stalls AppLoad's updates for 1 s)");
         Ok(())
     }
 
@@ -329,7 +337,13 @@ fn handle(mut s: TcpStream, sh: &Shared) -> io::Result<()> {
             let mut q = lock(&sh.events);
             for line in text.split(|c| c == '\n' || c == ';') {
                 let v: Vec<i32> = line.split_whitespace().filter_map(|t| t.parse().ok()).collect();
-                if v.len() == 4 || v.len() == 5 {
+                if (v.len() == 4 || v.len() == 5) && v[0] == SIM_INPUT_ERASER {
+                    q.push_back(Event::Eraser(v[3] != 0));
+                    n += 1;
+                } else if (v.len() == 4 || v.len() == 5) && v[0] == SIM_INPUT_PEN_NEAR {
+                    q.push_back(Event::PenNear(v[3] != 0));
+                    n += 1;
+                } else if v.len() == 4 || v.len() == 5 {
                     q.push_back(Event::Input(UserInput {
                         input_type: v[0],
                         dev_id: v.get(4).copied().unwrap_or(1),
