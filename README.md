@@ -1,12 +1,11 @@
 # LibrePixel
 
-A pixel-art editor for the reMarkable 2, written from scratch in Rust, plus the hello-world it
-grew out of. One static binary launched from AppLoad; nothing else to install on the tablet.
+A raster image editor and pixel-art editor for the reMarkable 2, written from in Rust.
 
 - Draw with the pen on a layered sprite over a 16-color palette. The eraser end of the Marker
   erases. Finger pans, two fingers zoom.
 - Saves `.ase` files that Aseprite and LibreSprite open as they are.
-- Exports PNG and JPG to copy off over USB or SSH, and a PDF straight into the tablet's own library.
+- Exports images as PDF straight into the tablet's own library, and PNG and JPG to copy off USB or SSH.
 - Runs on your PC too: `cargo run` opens the tablet in a browser window where the mouse is your
   finger (left button) or pen (right button). Same code, same events as on the device.
 
@@ -128,9 +127,7 @@ nearest of its first 16 colors; an RGBA or grayscale file is converted the same 
 keeps only its first frame. You are told when any of this happens. Saving always writes an indexed
 single-frame file.
 
-Not in this version: animation, flip and rotate, custom brushes, layer opacity
-editing, more than 16 colors. The plan for what comes next is in `CLAUDE.md`; open requests and
-their state are in `TODO.md`.
+*Not supported*: animation, flip and rotate, custom brushes, layer opacity editing, or more than 16 colors at a time.
 
 ### Settings
 
@@ -299,10 +296,10 @@ src/xochitl.rs               dropping a PDF into the tablet's library
 src/settings.rs              settings.json (flat JSON, no crate)
 src/ink.rs                   the editor's side of the librepixel-ink extension (arm + status files)
 extension/                   librepixel-ink.c (xovi extension), xovi.c (generated glue), build with tools/build_ink.sh
-src/bin/librepixel/              the editor: layout + widgets, canvas view, dialogs, the app itself
+src/bin/librepixel/          the editor: layout + widgets, canvas view, dialogs, the app itself
 src/bin/hello.rs             the hello world (smoke test for the pipeline)
 src/bin/fake_qtfb_server.rs  Linux/macOS stand-in for the on-device server (tools/run_local_test.sh)
-app/librepixel, app/hello        AppLoad manifests + icons
+app/librepixel, app/hello    AppLoad manifests + icons
 deploy.sh, deploy.ps1        build + copy to the tablet
 .cargo/config.toml           linker settings: rust-lld for both targets, so rustup alone is enough
 ```
